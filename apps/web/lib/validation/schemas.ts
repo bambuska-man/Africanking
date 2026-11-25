@@ -88,6 +88,14 @@ export const createReadingSchema = z.object({
       message: "kwh_self_consumed required when kwh_injected is missing",
     })
   }
+
+  const selfConsumed = d.kwh_self_consumed ?? d.kwh_consumed
+  if (d.kwh_generated != null && selfConsumed != null && selfConsumed > d.kwh_generated) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "kwh_self_consumed cannot exceed kwh_generated",
+    })
+  }
 })
 
 // Batch meter readings
@@ -111,6 +119,13 @@ const singleMeterReading = z.object({
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: "kwh_self_consumed required when kwh_injected is missing",
+    })
+  }
+
+  if (d.kwh_generated != null && d.kwh_self_consumed != null && d.kwh_self_consumed > d.kwh_generated) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "kwh_self_consumed cannot exceed kwh_generated",
     })
   }
 })
@@ -148,7 +163,15 @@ export const updateReadingSchema = z.object({
   status: z.enum(["pending", "verified", "rejected"]),
 })
 
-// Retire
+// Generation credits — internal allocation to cooperative members.
+// Deliberately no buyer / ESG-purpose fields: credits are not sold.
+export const allocateCreditSchema = z.object({
+  certificate_id: uuid,
+  basis: z.enum(["installed_capacity", "equal"]).default("installed_capacity"),
+}).strict()
+
+// Retire — LEGACY. Kept only so old clients get a clear 410 from
+// /api/certificates/retire; no UI submits this anymore.
 export const retireSchema = z.object({
   certificate_id: uuid,
   buyer_address: stellarAddress,
